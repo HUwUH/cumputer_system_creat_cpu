@@ -1,0 +1,2 @@
+# cumputer_system_creat_cpu
+东北大学计算机系统课程，使用verlinglog语言，修改完善一个cpu
