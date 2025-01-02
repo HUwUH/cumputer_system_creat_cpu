@@ -72,7 +72,7 @@ module EX(
     wire [31:0] alu_src1, alu_src2;
     wire [31:0] alu_result, ex_result;
 
-    assign alu_src1 = sel_alu_src1[1] ? ex_pc :               // 如果选择信号为1，选择PC值
+    assign alu_src1 = sel_alu_src1[1] ? ex_pc :              // 如果选择信号为1，选择PC值
                       sel_alu_src1[2] ? sa_zero_extend :     // 如果选择信号为2，选择移位数
                       rf_rdata1;                             // 默认选择寄存器数据1
 
