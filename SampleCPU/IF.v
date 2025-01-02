@@ -6,6 +6,9 @@ module IF(
     input wire rst,  // 复位信号
     input wire [`StallBus-1:0] stall,  // 流水线暂停信号
 
+    // input wire flush,
+    // input wire [31:0] new_pc,
+
     // 输入信号：分支信息
     input wire [`BR_WD-1:0] br_bus,  // 分支信号，包括是否为分支（br_e）和分支地址（br_addr）
 
@@ -18,15 +21,10 @@ module IF(
     output wire [31:0] inst_sram_addr,  // 指令SRAM地址
     output wire [31:0] inst_sram_wdata  // 指令SRAM写数据
 );
-    // PC寄存器：保存当前程序计数器（PC）值
-    reg [31:0] pc_reg;
-
-    // CE寄存器：用于控制指令获取模块是否有效
-    reg ce_reg;
-
-    // 下一个PC的值
-    wire [31:0] next_pc;
-
+    
+    reg [31:0] pc_reg;  // PC寄存器：保存当前程序计数器（PC）值
+    reg ce_reg; // CE寄存器：用于控制指令获取模块是否有效
+    wire [31:0] next_pc;    // 下一个PC的值
     // 分支有效信号及分支地址
     wire br_e;
     wire [31:0] br_addr;
@@ -43,8 +41,7 @@ module IF(
             // 如果复位信号有效，则将PC重置为指定值
             pc_reg <= 32'hbfbf_fffc;  // 初始化PC值
         end
-        else if (stall[0] == `NoStop) begin
-            // 如果没有暂停信号，则根据next_pc更新PC寄存器
+        else if (stall[0]==`NoStop) begin
             pc_reg <= next_pc;
         end
     end
@@ -54,7 +51,7 @@ module IF(
         if (rst) begin
             ce_reg <= 1'b0;  // 复位时关闭CE
         end
-        else if (stall[0] == `NoStop) begin
+        else if (stall[0]==`NoStop) begin
             ce_reg <= 1'b1;  // 没有暂停时启用CE
         end
     end
