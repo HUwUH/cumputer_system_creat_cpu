@@ -138,34 +138,29 @@ module ID(
     );
 
     // 判断指令类型
-    assign inst_ori     = op_d[6'b00_1101];
-    assign inst_lui     = op_d[6'b00_1111];
-    assign inst_addiu   = op_d[6'b00_1001];
-    assign inst_beq     = op_d[6'b00_0100];
+    assign inst_ori     = op_d[6'b00_1101];//或立即数指令
+    assign inst_lui     = op_d[6'b00_1111];//加载高位立即数指令
+    assign inst_addiu   = op_d[6'b00_1001];//加立即数指令 (最终，目标寄存器 $rt 的值为：imm << 16)
+    assign inst_beq     = op_d[6'b00_0100];//分支等于指令
 
 
-
+    /*TODO: lby:这一段的操作数选择，有几个操作数始终不选择，有问题
+            例如，分支操作，应该会用到“选择PC作为ALU的第一个操作数”
+    */
     // ALU第一个操作数的选择逻辑
     assign sel_alu_src1[0] = inst_ori | inst_addiu;  // 选择rs作为ALU的第一个操作数
-
     assign sel_alu_src1[1] = 1'b0;  // 选择PC作为ALU的第一个操作数（未使用）
-
-    
     assign sel_alu_src1[2] = 1'b0;  // 选择sa作为ALU的第一个操作数（未使用）
 
     // ALU第二个操作数的选择逻辑
     assign sel_alu_src2[0] = 1'b0;  // 选择rt作为ALU的第二个操作数（未使用）
-
-
     assign sel_alu_src2[1] = inst_lui | inst_addiu;  // 选择符号扩展的立即数作为ALU的第二个操作数
-
-
     assign sel_alu_src2[2] = 1'b0;  // 选择常数8作为ALU的第二个操作数（未使用）
-
-
     assign sel_alu_src2[3] = inst_ori;  // 选择零扩展的立即数作为ALU的第二个操作数
 
-
+    /*TODO: lby:这一段可以根据指令集参考资料：1，在“判断指令类型”加判断
+                2.然后在此处连上，为选择指令提供在某些条件下的成立
+    */
     // ALU操作类型控制信号
     assign op_add = inst_addiu;
     assign op_sub = 1'b0;
@@ -186,11 +181,11 @@ module ID(
                      op_sll, op_srl, op_sra, op_lui};
 
 
-
+    /*TODO: lby: 这一段，在部分指令下，应当给予赋值。
+            例如：如果是ld（Load），那么en为1；如果是store，那么data_ram_wen为1
+    */
     // 数据存储器使能和写使能信号（未使用）
     assign data_ram_en = 1'b0;
-
-
     assign data_ram_wen = 1'b0;
 
 
@@ -199,7 +194,9 @@ module ID(
     assign rf_we = inst_ori | inst_lui | inst_addiu;
 
 
-
+    /*TODO：lby：结合上一个todo，结合mem段功能
+            如果是store，需要设定好写到的地址
+    */
     // 寄存器文件写地址选择逻辑
     assign sel_rf_dst[0] = 1'b0;  // 选择rd作为写地址
     assign sel_rf_dst[1] = inst_ori | inst_lui | inst_addiu;  // 选择rt作为写地址
@@ -210,7 +207,11 @@ module ID(
                     | {5{sel_rf_dst[1]}} & rt
                     | {5{sel_rf_dst[2]}} & 32'd31;
 
-    // 寄存器文件写数据选择信号（未使用）
+    /*TODO：lby：结合上一个todo，结合mem段功能
+            1.传给wb的是ex段的，为一种信号
+            2.传给wb的是mem的如load，为另一种信号
+    */
+    // 寄存器文件写数据选择信号（未使用）//lby：这个gpt加的注释可能不对
     assign sel_rf_res = 1'b0; 
 
     // 组合ID段传递到EX段的总线信号
