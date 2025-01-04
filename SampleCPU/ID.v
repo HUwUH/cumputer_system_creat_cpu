@@ -136,43 +136,96 @@ module ID(
     	.in  (rt  ),
         .out (rt_d )
     );
-
+    /*TODO:这里指令数量不够
+    */
     // 判断指令类型
     assign inst_ori     = op_d[6'b00_1101];//或立即数指令
     assign inst_lui     = op_d[6'b00_1111];//加载高位立即数指令
     assign inst_addiu   = op_d[6'b00_1001];//加立即数指令 (最终，目标寄存器 $rt 的值为：imm << 16)
     assign inst_beq     = op_d[6'b00_0100];//分支等于指令
-
+    assign inst_subu    = op_d[6'b00_0000] && func_d[6'b10_0011];
+    assign inst_jr      = op_d[6'b00_0000] && func_d[6'b00_1000];
+    assign inst_jal     = op_d[6'b00_0011];
+    assign inst_lw      = op_d[6'b10_0011];
+    assign inst_addu    = op_d[6'b00_0000] && func_d[6'b10_0001];
+    assign inst_or      = op_d[6'b00_0000] && func_d[6'b10_0101];
+    assign inst_sll     = op_d[6'b00_0000] && func_d[6'b00_0000];
+    assign inst_bne     = op_d[6'b00_0101];
+    assign inst_xor     = op_d[6'b00_0000] && func_d[6'b10_0110];
+    assign inst_xori    = op_d[6'b00_1110];
+    assign inst_nor     = op_d[6'b00_0000] && func_d[6'b10_0111];
+    assign inst_sw      = op_d[6'b10_1011]; 
+    assign inst_sltu    = op_d[6'b00_0000] && func_d[6'b10_1011];
+    assign inst_slt     = op_d[6'b00_0000] && func_d[6'b10_1010];
+    assign inst_slti    = op_d[6'b00_1010];
+    assign inst_sltiu   = op_d[6'b00_1011];
+    assign inst_j       = op_d[6'b00_0010]; 
+    assign inst_add     = op_d[6'b00_0000] && func_d[6'b10_0000];
+    assign inst_addi    = op_d[6'b00_1000];
+    assign inst_sub     = op_d[6'b00_0000] && func_d[6'b10_0010];
+    assign inst_and     = op_d[6'b00_0000] && func_d[6'b10_0100];
+    assign inst_andi    = op_d[6'b00_1100];
+    assign inst_sllv    = op_d[6'b00_0000] && func_d[6'b00_0100];
+    assign inst_sra     = op_d[6'b00_0000] && func_d[6'b00_0011];
+    assign inst_srav    = op_d[6'b00_0000] && func_d[6'b00_0111];
+    assign inst_srl     = op_d[6'b00_0000] && func_d[6'b00_0010];
+    assign inst_srlv    = op_d[6'b00_0000] && func_d[6'b00_0110];
+    assign inst_bgez    = op_d[6'b00_0001] && rt_d[5'b00001];
+    assign inst_bgtz    = op_d[6'b00_0111] && rt_d[5'b00000];
+    assign inst_blez    = op_d[6'b00_0110] && rt_d[5'b00000];
+    assign inst_bltz    = op_d[6'b00_0001] && rt_d[5'b00000];
+    assign inst_bltzal  = op_d[6'b00_0001] && rt_d[5'b10000];
+    assign inst_bgezal  = op_d[6'b00_0001] && rt_d[5'b10001];
+    assign inst_jalr    = op_d[6'b00_0000] && func_d[6'b00_1001];
+    assign inst_div     = op_d[6'b00_0000] && func_d[6'b01_1010];
+    assign inst_divu    = op_d[6'b00_0000] && func_d[6'b01_1011];
+    assign inst_mflo    = op_d[6'b00_0000] && func_d[6'b01_0010];
+    assign inst_mfhi    = op_d[6'b00_0000] && func_d[6'b01_0000];
+    assign inst_mult    = op_d[6'b00_0000] && func_d[6'b01_1000];
+    assign inst_multu   = op_d[6'b00_0000] && func_d[6'b01_1001];
+    assign inst_mthi    = op_d[6'b00_0000] && func_d[6'b01_0001];
+    assign inst_mtlo    = op_d[6'b00_0000] && func_d[6'b01_0011];
+    assign inst_lb      = op_d[6'b10_0000];
+    assign inst_lbu     = op_d[6'b10_0100];
+    assign inst_lh      = op_d[6'b10_0001];
+    assign inst_lhu     = op_d[6'b10_0101];
+    assign inst_sb      = op_d[6'b10_1000];
+    assign inst_sh      = op_d[6'b10_1001];
+    assign inst_lsa     = op_d[6'b01_1100] && func_d[6'b11_0111];
 
     /*TODO: lby:这一段的操作数选择，有几个操作数始终不选择，有问题
             例如，分支操作，应该会用到“选择PC作为ALU的第一个操作数”
     */
     // ALU第一个操作数的选择逻辑
-    assign sel_alu_src1[0] = inst_ori | inst_addiu;  // 选择rs作为ALU的第一个操作数
-    assign sel_alu_src1[1] = 1'b0;  // 选择PC作为ALU的第一个操作数（未使用）
-    assign sel_alu_src1[2] = 1'b0;  // 选择sa作为ALU的第一个操作数（未使用）
+    assign sel_alu_src1[0] = inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_bgez | inst_srlv | inst_srav | inst_sllv | inst_andi | inst_and | inst_sub | inst_addi | inst_add | inst_sltiu | inst_slti | inst_slt | inst_sltu | inst_sw | inst_nor | inst_xori | inst_xor | inst_ori | inst_addiu | inst_subu | inst_jr | inst_lw | inst_addu | 
+                            inst_or   | inst_mflo  |inst_mfhi | inst_lb |inst_lsa;  // 选择rs作为ALU的第一个操作数
+    assign sel_alu_src1[1] = inst_jal | inst_bltzal | inst_bgezal |inst_jalr;  // 选择PC作为ALU的第一个操作数（未使用）
+    assign sel_alu_src1[2] =inst_srl |inst_sra | inst_sll;  // 选择sa作为ALU的第一个操作数（未使用）
 
     // ALU第二个操作数的选择逻辑
-    assign sel_alu_src2[0] = 1'b0;  // 选择rt作为ALU的第二个操作数（未使用）
-    assign sel_alu_src2[1] = inst_lui | inst_addiu;  // 选择符号扩展的立即数作为ALU的第二个操作数
-    assign sel_alu_src2[2] = 1'b0;  // 选择常数8作为ALU的第二个操作数（未使用）
-    assign sel_alu_src2[3] = inst_ori;  // 选择零扩展的立即数作为ALU的第二个操作数
+    assign sel_alu_src2[0] = inst_lsa|inst_mfhi|inst_mflo | inst_srl | inst_srlv | inst_srav | inst_sra | inst_sllv | inst_and | inst_sub | inst_add | inst_slt | inst_sltu | inst_nor |
+     inst_xor  | inst_subu | inst_addu | inst_or |
+      inst_sll |inst_div | inst_divu;  // 选择rt作为ALU的第二个操作数（未使用）
+    assign sel_alu_src2[1] = inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_addi | inst_sltiu | inst_slti | inst_sw | inst_lui | inst_addiu |
+     inst_lw |inst_lb;  // 选择符号扩展的立即数作为ALU的第二个操作数
+    assign sel_alu_src2[2] =inst_jal | inst_bltzal | inst_bgezal |inst_jalr;  // 选择常数8作为ALU的第二个操作数（未使用）
+    assign sel_alu_src2[3] =  inst_andi | inst_xori | inst_ori;  // 选择零扩展的立即数作为ALU的第二个操作数
 
     /*TODO: lby:这一段可以根据指令集参考资料：1，在“判断指令类型”加判断
                 2.然后在此处连上，为选择指令提供在某些条件下的成立
     */
     // ALU操作类型控制信号
-    assign op_add = inst_addiu;
-    assign op_sub = 1'b0;
-    assign op_slt = 1'b0;
-    assign op_sltu = 1'b0;
-    assign op_and = 1'b0;
-    assign op_nor = 1'b0;
-    assign op_or = inst_ori;
-    assign op_xor = 1'b0;
-    assign op_sll = 1'b0;
-    assign op_srl = 1'b0;
-    assign op_sra = 1'b0;
+    assign op_add =inst_lsa|inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu |  inst_lb | inst_addi | inst_add | inst_addiu | inst_lw | inst_addu | inst_jal | inst_sw | inst_bltzal |inst_bgezal|inst_jalr;
+    assign op_sub =inst_sub | inst_subu;
+    assign op_slt = inst_slt | inst_slti; //有符号比较
+    assign op_sltu = inst_sltu|inst_sltiu;  //无符号比较
+    assign op_and = inst_andi | inst_and | inst_mflo |inst_mfhi;
+    assign op_nor = inst_nor;
+    assign op_or = inst_ori | inst_or;
+    assign op_xor = inst_xori |inst_xor;
+    assign op_sll = inst_sllv | inst_sll;//逻辑左移
+    assign op_srl = inst_srl | inst_srlv;//逻辑右移
+    assign op_sra = inst_srav | inst_sra;//算术右移
     assign op_lui = inst_lui;
 
     // 组合ALU操作控制信号
@@ -185,8 +238,8 @@ module ID(
             例如：如果是ld（Load），那么en为1；如果是store，那么data_ram_wen为1
     */
     // 数据存储器使能和写使能信号（未使用）
-    assign data_ram_en = 1'b0;
-    assign data_ram_wen = 1'b0;
+    assign data_ram_en =inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_lw | inst_sw | inst_lb;
+    assign data_ram_wen = inst_sw ? 4'b1111 : 4'b0000;
 
 
 
@@ -195,12 +248,15 @@ module ID(
 
 
     /*TODO：lby：结合上一个todo，结合mem段功能
-            如果是store，需要设定好写到的地址
+            如果是store，需要设定好写到的地址，选择第几个指令的位置
     */
-    // 寄存器文件写地址选择逻辑
-    assign sel_rf_dst[0] = 1'b0;  // 选择rd作为写地址
-    assign sel_rf_dst[1] = inst_ori | inst_lui | inst_addiu;  // 选择rt作为写地址
-    assign sel_rf_dst[2] = 1'b0;  // 选择31号寄存器作为写地址
+    // 寄存器文件写地址选择逻辑，判断
+    assign sel_rf_dst[0] = inst_lsa|inst_mfhi | inst_mflo | inst_jalr |inst_srl | inst_srlv | inst_srav | inst_sra | inst_sllv | inst_and | inst_sub | inst_add 
+    | inst_slt | inst_sltu | inst_nor | inst_xor |
+     inst_subu | inst_addu | inst_or | inst_sll;  // 选择rd作为写地址
+    assign sel_rf_dst[1]  = inst_lhu | inst_lh | inst_lbu | inst_lb |inst_andi | inst_addi | inst_sltiu | 
+    inst_slti | inst_xori | inst_ori | inst_lui | inst_addiu | inst_lw;  // 选择rt作为写地址
+    assign sel_rf_dst[2] = inst_jal | inst_bltzal | inst_bgezal;  // 选择31号寄存器作为写地址
 
     // 根据选择信号确定寄存器文件写地址
     assign rf_waddr = {5{sel_rf_dst[0]}} & rd 
@@ -212,7 +268,7 @@ module ID(
             2.传给wb的是mem的如load，为另一种信号
     */
     // 寄存器文件写数据选择信号（未使用）//lby：这个gpt加的注释可能不对
-    assign sel_rf_res = 1'b0; 
+    assign sel_rf_res = 1'b0; //学长的代码在这里没有修改
 
     // 组合ID段传递到EX段的总线信号
     assign id_to_ex_bus = {

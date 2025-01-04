@@ -52,6 +52,9 @@ module MEM(
         ex_result       // 31:0 EX阶段计算结果
     } =  ex_to_mem_bus_r;
 
+    //XXX:lby :添加memresult的赋值
+    assign mem_result = data_sram_rdata;
+
     // 根据sel_rf_res信号选择寄存器写入的数据，若为1则使用MEM阶段结果，否则使用EX阶段结果
     assign rf_wdata = sel_rf_res ? mem_result : ex_result;
 
