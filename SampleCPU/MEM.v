@@ -36,7 +36,7 @@ module MEM(
     // 解码来自EX阶段的数据
     wire [31:0] mem_pc;            // 当前指令的PC值
     wire data_ram_en;              // 数据存储器使能信号
-    wire [3:0] data_ram_wen;       // 数据存储器写使能信号
+    wire [3:0] data_ram_wen, data_ram_readen;   // 数据存储器写使能信号
     wire sel_rf_res;               // 寄存器写入数据来源选择信号
     wire rf_we;                    // 寄存器写使能信号
     wire [4:0] rf_waddr;           // 寄存器写地址
@@ -46,6 +46,7 @@ module MEM(
 
     // 从ex_to_mem_bus_r中解码出各个信号
     assign {
+        data_ram_readen,// 79:76
         mem_pc,         // 75:44 当前指令的PC值
         data_ram_en,    // 43 数据存储器使能信号
         data_ram_wen,   // 42:39 数据存储器写使能信号
@@ -59,7 +60,20 @@ module MEM(
     assign mem_result = data_sram_rdata;
 
     // 根据sel_rf_res信号选择寄存器写入的数据，若为1则使用MEM阶段结果，否则使用EX阶段结果
-    assign rf_wdata = sel_rf_res ? mem_result : ex_result;
+        assign rf_wdata =     (data_ram_readen==4'b1111 && data_ram_en==1'b1) ? data_sram_rdata 
+                        : (data_ram_readen==4'b0001 && data_ram_en==1'b1 && ex_result[1:0]==2'b00) ?({{24{data_sram_rdata[7]}},data_sram_rdata[7:0]})
+                        : (data_ram_readen==4'b0001 && data_ram_en==1'b1 && ex_result[1:0]==2'b01) ?({{24{data_sram_rdata[15]}},data_sram_rdata[15:8]})
+                        : (data_ram_readen==4'b0001 && data_ram_en==1'b1 && ex_result[1:0]==2'b10) ?({{24{data_sram_rdata[23]}},data_sram_rdata[23:16]})
+                        : (data_ram_readen==4'b0001 && data_ram_en==1'b1 && ex_result[1:0]==2'b11) ?({{24{data_sram_rdata[31]}},data_sram_rdata[31:24]})
+                        : (data_ram_readen==4'b0010 && data_ram_en==1'b1 && ex_result[1:0]==2'b00) ?({24'b0,data_sram_rdata[7:0]})
+                        : (data_ram_readen==4'b0010 && data_ram_en==1'b1 && ex_result[1:0]==2'b01) ?({24'b0,data_sram_rdata[15:8]})
+                        : (data_ram_readen==4'b0010 && data_ram_en==1'b1 && ex_result[1:0]==2'b10) ?({24'b0,data_sram_rdata[23:16]})
+                        : (data_ram_readen==4'b0010 && data_ram_en==1'b1 && ex_result[1:0]==2'b11) ?({24'b0,data_sram_rdata[31:24]})
+                        : (data_ram_readen==4'b0011 && data_ram_en==1'b1 && ex_result[1:0]==2'b00) ?({{16{data_sram_rdata[15]}},data_sram_rdata[15:0]})
+                        : (data_ram_readen==4'b0011 && data_ram_en==1'b1 && ex_result[1:0]==2'b10) ?({{16{data_sram_rdata[31]}},data_sram_rdata[31:16]})
+                        : (data_ram_readen==4'b0100 && data_ram_en==1'b1 && ex_result[1:0]==2'b00) ?({16'b0,data_sram_rdata[15:0]})
+                        : (data_ram_readen==4'b0100 && data_ram_en==1'b1 && ex_result[1:0]==2'b10) ?({16'b0,data_sram_rdata[31:16]})
+                        : ex_result;
 
     // 构造传递到WB阶段的数据总线
     assign mem_to_wb_bus = {
@@ -68,7 +82,11 @@ module MEM(
         rf_waddr,   // 36:32 寄存器写地址
         rf_wdata    // 31:0 寄存器写入数据
     };
-
+    assign  mem_to_id =
+    {   rf_we,      // 37
+        rf_waddr,   // 36:32
+        rf_wdata    // 31:0
+    };
 
 
 

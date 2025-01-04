@@ -54,7 +54,13 @@ module WB(
         rf_waddr,
         rf_wdata
     };
-
+    
+    assign wb_to_id = {
+        rf_we,
+        rf_waddr,
+        rf_wdata
+    };
+    
     assign debug_wb_pc = wb_pc;  // WB阶段的PC值
     assign debug_wb_rf_wen = {4{rf_we}};  // 如果写使能为1，设置4个bit为1
     assign debug_wb_rf_wnum = rf_waddr;  // 写入的寄存器地址
