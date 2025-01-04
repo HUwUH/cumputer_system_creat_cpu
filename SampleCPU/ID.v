@@ -1,11 +1,11 @@
 `include "lib/defines.vh"
 module ID(
-    input wire clk,  // 时钟信号
-    input wire rst,  // 复位信号
-    // input wire flush,  // 刷新信号（注释掉了）
-    input wire [`StallBus-1:0] stall,  // 流水线暂停信号
-    
-    output wire stallreq,  // 请求暂停信号
+    input wire clk,                     // 时钟信号
+    input wire rst,                     // 复位信号
+    // input wire flush,                // 刷新信号（注释掉了）
+    input wire [`StallBus-1:0] stall,   // 流水线暂停信号
+    input wire ex_is_load,              // EX阶段是否为加载指令
+    output wire stallreq,               // 请求暂停信号
 
     input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,  // 从IF段传递到ID段的总线
 
@@ -13,9 +13,15 @@ module ID(
 
     input wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus,  // 从WB段传递到寄存器文件的总线
 
+    input wire [37:0] ex_to_id,          // EX阶段传递到ID阶段的总线信号
+    input wire [37:0] mem_to_id,         // MEM阶段传递到ID阶段的总线信号
+    input wire [37:0] wb_to_id,          // WB阶段传递到ID阶段的总线信号
+
+    input wire [65:0] hilo_ex_to_id,     // EX阶段传递到ID阶段的HI/LO寄存器信号
     output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,  // 从ID段传递到EX段的总线
 
-    output wire [`BR_WD-1:0] br_bus  // 分支信号总线
+    output wire [`BR_WD-1:0] br_bus,  // 分支信号总线
+    output wire stallreq_from_id         // ID阶段产生的暂停请求信号
 );
 
     reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;  // 用于存储从IF段传递到ID段的总线数据

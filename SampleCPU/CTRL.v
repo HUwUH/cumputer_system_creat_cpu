@@ -1,8 +1,8 @@
 `include "lib/defines.vh"
 module CTRL(
     input wire rst, // 复位信号
-    // input wire stallreq_for_ex,  // 来自EX阶段的暂停请求信号
-    // input wire stallreq_for_load,
+    input wire stallreq_from_ex,  // 来自EX阶段的暂停请求信号
+    input wire stallreq_from_id,
 
     // output reg flush,
     // output reg [31:0] new_pc,

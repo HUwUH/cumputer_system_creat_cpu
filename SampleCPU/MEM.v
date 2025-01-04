@@ -9,7 +9,10 @@ module MEM(
     input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus, // 来自EX阶段的数据总线
     input wire [31:0] data_sram_rdata,            // 数据存储器读取的数据（来自MEM阶段）
 
-    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus  // 传递给WB阶段的数据总线
+    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,  // 传递给WB阶段的数据总线
+
+    //XXX：lby：add
+    output wire [37:0] mem_to_id
 );
 
     // 保存EX阶段传递到MEM阶段的数据总线

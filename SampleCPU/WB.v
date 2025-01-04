@@ -13,7 +13,10 @@ module WB(
     output wire [31:0] debug_wb_pc,  // 调试：WB阶段的PC值
     output wire [3:0] debug_wb_rf_wen,  // 调试：WB阶段的寄存器写使能信号
     output wire [4:0] debug_wb_rf_wnum,  // 调试：WB阶段的寄存器写地址
-    output wire [31:0] debug_wb_rf_wdata  // 调试：WB阶段的寄存器写数据
+    output wire [31:0] debug_wb_rf_wdata,  // 调试：WB阶段的寄存器写数据
+
+    //XXX：add
+    output  wire [37:0] wb_to_id
 );
 
     reg [`MEM_TO_WB_WD-1:0] mem_to_wb_bus_r;  // 存储从MEM阶段传来的数据

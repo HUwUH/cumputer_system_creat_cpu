@@ -13,7 +13,13 @@ module EX(
     output wire data_sram_en,  // 数据存储器使能信号
     output wire [3:0] data_sram_wen, // 数据存储器写使能信号
     output wire [31:0] data_sram_addr, // 数据存储器地址
-    output wire [31:0] data_sram_wdata // 数据存储器写入数据
+    output wire [31:0] data_sram_wdata, // 数据存储器写入数据
+
+    //XXX:lby:add
+    output wire [37:0] ex_to_id,
+    output wire stallreq_from_ex,
+    output wire ex_is_load,
+    output wire [65:0] hilo_ex_to_id
 );
 
     // 保存从ID阶段传递过来的数据，用于流水线暂停时的数据保持
@@ -143,75 +149,75 @@ module EX(
     );
 
     // 除法控制逻辑
-    always @ (*) begin
-        if (rst) begin
-            stallreq_for_div = `NoStop;
-            div_opdata1_o = `ZeroWord;
-            div_opdata2_o = `ZeroWord;
-            div_start_o = `DivStop;
-            signed_div_o = 1'b0;
-        end
-        else begin
-            stallreq_for_div = `NoStop;
-            div_opdata1_o = `ZeroWord;
-            div_opdata2_o = `ZeroWord;
-            div_start_o = `DivStop;
-            signed_div_o = 1'b0;
-            case ({inst_div,inst_divu})
-                2'b10:begin // 有符号除法
-                    if (div_ready_i == `DivResultNotReady) begin
-                        div_opdata1_o = rf_rdata1;
-                        div_opdata2_o = rf_rdata2;
-                        div_start_o = `DivStart;
-                        signed_div_o = 1'b1;
-                        stallreq_for_div = `Stop;
-                    end
-                    else if (div_ready_i == `DivResultReady) begin
-                        div_opdata1_o = rf_rdata1;
-                        div_opdata2_o = rf_rdata2;
-                        div_start_o = `DivStop;
-                        signed_div_o = 1'b1;
-                        stallreq_for_div = `NoStop;
-                    end
-                    //gpt删除了这一段------------------------------开始
-                    else begin
-                        div_opdata1_o = `ZeroWord;
-                        div_opdata2_o = `ZeroWord;
-                        div_start_o = `DivStop;
-                        signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
-                    //gpt删除了这一段------------------------------结束
-                end
-                2'b01:begin // 无符号除法
-                    if (div_ready_i == `DivResultNotReady) begin
-                        div_opdata1_o = rf_rdata1;
-                        div_opdata2_o = rf_rdata2;
-                        div_start_o = `DivStart;
-                        signed_div_o = 1'b0;
-                        stallreq_for_div = `Stop;
-                    end
-                    else if (div_ready_i == `DivResultReady) begin
-                        div_opdata1_o = rf_rdata1;
-                        div_opdata2_o = rf_rdata2;
-                        div_start_o = `DivStop;
-                        signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
-                    end
-                    //gpt删除了这一段------------------------------开始
-                    else begin
-                        div_opdata1_o = `ZeroWord;
-                        div_opdata2_o = `ZeroWord;
-                        div_start_o = `DivStop;
-                        signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
-                    end
-                    //gpt删除了这一段------------------------------结束
-                end
-                default:begin
-                end
-            endcase
-        end
-    end
+    // always @ (*) begin
+    //     if (rst) begin
+    //         stallreq_for_div = `NoStop;
+    //         div_opdata1_o = `ZeroWord;
+    //         div_opdata2_o = `ZeroWord;
+    //         div_start_o = `DivStop;
+    //         signed_div_o = 1'b0;
+        // end
+        // else begin
+        //     stallreq_for_div = `NoStop;
+        //     div_opdata1_o = `ZeroWord;
+        //     div_opdata2_o = `ZeroWord;
+        //     div_start_o = `DivStop;
+        //     signed_div_o = 1'b0;
+        //     case ({inst_div,inst_divu})
+        //         2'b10:begin // 有符号除法
+        //             if (div_ready_i == `DivResultNotReady) begin
+        //                 div_opdata1_o = rf_rdata1;
+        //                 div_opdata2_o = rf_rdata2;
+        //                 div_start_o = `DivStart;
+        //                 signed_div_o = 1'b1;
+        //                 stallreq_for_div = `Stop;
+        //             end
+        //             else if (div_ready_i == `DivResultReady) begin
+        //                 div_opdata1_o = rf_rdata1;
+        //                 div_opdata2_o = rf_rdata2;
+        //                 div_start_o = `DivStop;
+        //                 signed_div_o = 1'b1;
+        //                 stallreq_for_div = `NoStop;
+        //             end
+        //             //gpt删除了这一段------------------------------开始
+        //             else begin
+        //                 div_opdata1_o = `ZeroWord;
+        //                 div_opdata2_o = `ZeroWord;
+        //                 div_start_o = `DivStop;
+        //                 signed_div_o = 1'b0;
+        //                 stallreq_for_div = `NoStop;
+        //             //gpt删除了这一段------------------------------结束
+        //         end
+        //         2'b01:begin // 无符号除法
+        //             if (div_ready_i == `DivResultNotReady) begin
+        //                 div_opdata1_o = rf_rdata1;
+        //                 div_opdata2_o = rf_rdata2;
+        //                 div_start_o = `DivStart;
+        //                 signed_div_o = 1'b0;
+        //                 stallreq_for_div = `Stop;
+    //                 end
+    //                 else if (div_ready_i == `DivResultReady) begin
+    //                     div_opdata1_o = rf_rdata1;
+    //                     div_opdata2_o = rf_rdata2;
+    //                     div_start_o = `DivStop;
+    //                     signed_div_o = 1'b0;
+    //                     stallreq_for_div = `NoStop;
+    //                 end
+    //                 //gpt删除了这一段------------------------------开始
+    //                 else begin
+    //                     div_opdata1_o = `ZeroWord;
+    //                     div_opdata2_o = `ZeroWord;
+    //                     div_start_o = `DivStop;
+    //                     signed_div_o = 1'b0;
+    //                     stallreq_for_div = `NoStop;
+    //                 end
+    //                 //gpt删除了这一段------------------------------结束
+    //             end
+    //             default:begin
+    //             end
+    //         endcase
+    //     end
+    // end
 
     //gpt删除了这一行： // mul_result 和 div_result 可以直接使用
     
