@@ -46,7 +46,7 @@ module EX(
     wire [2:0] sel_alu_src1;           // ALU操作数1选择信号
     wire [3:0] sel_alu_src2;           // ALU操作数2选择信号
     wire data_ram_en;                  // 数据存储器使能信号
-    wire [3:0] data_ram_wen;           // 数据存储器写使能信号
+    wire [3:0] data_ram_wen,data_ram_readen;           // 数据存储器写使能信号
     wire rf_we;                        // 寄存器写使能信号
     wire [4:0] rf_waddr;               // 寄存器写地址
     wire sel_rf_res;                   // 寄存器写入数据来源选择信号
@@ -54,6 +54,13 @@ module EX(
     reg is_in_delayslot;               // 是否在延迟槽
 
     assign {
+        data_ram_readen,//168:165
+        inst_mthi,      //164
+        inst_mtlo,      //163
+        inst_multu,     //162
+        inst_mult,      //161
+        inst_divu,      //160
+        inst_div,       //159
         ex_pc,          // 148:117 当前指令的PC值
         inst,           // 116:85 当前指令
         alu_op,         // 84:83 ALU操作码
@@ -67,6 +74,9 @@ module EX(
         rf_rdata1,      // 63:32 寄存器读数据1
         rf_rdata2       // 31:0 寄存器读数据2
     } = id_to_ex_bus_r;
+
+    // 对应于load指令
+    assign ex_is_load = (inst[31:26] == 6'b10_0011) ? 1'b1 : 1'b0;
 
     // 立即数和移位数的扩展
     wire [31:0] imm_sign_extend, imm_zero_extend, sa_zero_extend;
@@ -99,6 +109,7 @@ module EX(
 
     // 输出到MEM阶段的数据总线
     assign ex_to_mem_bus = {
+        data_ram_readen,// 79:76 //XXX:添加
         ex_pc,          // 75:44 当前指令的PC值
         data_ram_en,    // 43 数据存储器使能信号
         data_ram_wen,   // 42:39 数据存储器写使能信号
@@ -108,45 +119,98 @@ module EX(
         ex_result       // 31:0 EX阶段结果
     };
 
-    // MUL part 乘法单元
+    assign  ex_to_id ={   
+        rf_we,          // 37
+        rf_waddr,       // 36:32
+        ex_result       // 31:0
+    };
+
+
+
+    /*XXX: 添加内存读取系统
+    这段代码的功能是 控制数据内存的读写操作，具体包括：
+
+        使能信号：控制是否访问数据内存。
+        写使能信号：根据访问类型和地址对齐方式生成正确的写使能信号。
+        地址信号：将执行阶段计算的内存地址传递给数据内存。
+        写入数据：根据写使能信号将寄存器文件中的数据按需对齐并写入内存。
+    */
+    assign data_sram_en = data_ram_en;
+    assign data_sram_wen =   (data_ram_readen==4'b0101 && ex_result[1:0] == 2'b00 )? 4'b0001 
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b01 )? 4'b0010
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b10 )? 4'b0100
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b11 )? 4'b1000
+                            :(data_ram_readen==4'b0111 && ex_result[1:0] == 2'b00 )? 4'b0011
+                            :(data_ram_readen==4'b0111 && ex_result[1:0]== 2'b10 )? 4'b1100
+                            : data_ram_wen;//写使能信号        
+    assign data_sram_addr = ex_result;  //内存的地址
+    assign data_sram_wdata = data_sram_wen==4'b1111 ? rf_rdata2 
+                            :data_sram_wen==4'b0001 ? {24'b0,rf_rdata2[7:0]}
+                            :data_sram_wen==4'b0010 ? {16'b0,rf_rdata2[7:0],8'b0}
+                            :data_sram_wen==4'b0100 ? {8'b0,rf_rdata2[7:0],16'b0}
+                            :data_sram_wen==4'b1000 ? {rf_rdata2[7:0],24'b0}
+                            :data_sram_wen==4'b0011 ? {16'b0,rf_rdata2[15:0]}
+                            :data_sram_wen==4'b1100 ? {rf_rdata2[15:0],16'b0}
+                            :32'b0;
+
+    //XXX: 没添加乘法除法
+    wire hi_wen,lo_wen,inst_mthi,inst_mtlo;
+    wire [31:0] hi_data,lo_data;
+    wire inst_mult,inst_multu;
     wire [63:0] mul_result;
-    wire mul_signed; // 有符号乘法标记
 
-    mul u_mul(
-    	.clk        (clk            ),
-        .resetn     (~rst           ),
-        .mul_signed (mul_signed     ),
-        .ina        (      ), // 乘法源操作数1
-        .inb        (      ), // 乘法源操作数2
-        //gpt修改上两行如下
-        // .ina        (rf_rdata1      ), // 乘法源操作数1
-        // .inb        (rf_rdata2      ), // 乘法源操作数2
-        .result     (mul_result     ) // 乘法结果 64bit
-    );
 
-    // DIV part 除法单元
-    wire [63:0] div_result;
-    wire inst_div, inst_divu;         // 是否是除法指令
-    wire div_ready_i;                 // 除法结果是否准备好
-    reg stallreq_for_div;             // 除法暂停信号
-    assign stallreq_for_ex = stallreq_for_div;
 
-    reg [31:0] div_opdata1_o;
-    reg [31:0] div_opdata2_o;
-    reg div_start_o;
-    reg signed_div_o;
 
-    div u_div(
-    	.rst          (rst          ),
-        .clk          (clk          ),
-        .signed_div_i (signed_div_o ),
-        .opdata1_i    (div_opdata1_o    ),
-        .opdata2_i    (div_opdata2_o    ),
-        .start_i      (div_start_o      ),
-        .annul_i      (1'b0      ),
-        .result_o     (div_result     ), // 除法结果 64bit
-        .ready_o      (div_ready_i      )
-    );
+
+
+
+
+
+
+
+
+
+
+    // // MUL part 乘法单元
+    // wire [63:0] mul_result;
+    // wire mul_signed; // 有符号乘法标记
+
+    // mul u_mul(
+    // 	.clk        (clk            ),
+    //     .resetn     (~rst           ),
+    //     .mul_signed (mul_signed     ),
+    //     .ina        (      ), // 乘法源操作数1
+    //     .inb        (      ), // 乘法源操作数2
+    //     //gpt修改上两行如下
+    //     // .ina        (rf_rdata1      ), // 乘法源操作数1
+    //     // .inb        (rf_rdata2      ), // 乘法源操作数2
+    //     .result     (mul_result     ) // 乘法结果 64bit
+    // );
+
+    // // DIV part 除法单元
+    // wire [63:0] div_result;
+    // wire inst_div, inst_divu;         // 是否是除法指令
+    // wire div_ready_i;                 // 除法结果是否准备好
+    // reg stallreq_for_div;             // 除法暂停信号
+    // assign stallreq_for_ex = stallreq_for_div;
+
+    // reg [31:0] div_opdata1_o;
+    // reg [31:0] div_opdata2_o;
+    // reg div_start_o;
+    // reg signed_div_o;
+
+    // div u_div(
+    // 	.rst          (rst          ),
+    //     .clk          (clk          ),
+    //     .signed_div_i (signed_div_o ),
+    //     .opdata1_i    (div_opdata1_o    ),
+    //     .opdata2_i    (div_opdata2_o    ),
+    //     .start_i      (div_start_o      ),
+    //     .annul_i      (1'b0      ),
+    //     .result_o     (div_result     ), // 除法结果 64bit
+    //     .ready_o      (div_ready_i      )
+    // );
 
     // 除法控制逻辑
     // always @ (*) begin

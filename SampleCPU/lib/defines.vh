@@ -1,6 +1,6 @@
 `define IF_TO_ID_WD 33
 `define ID_TO_EX_WD 169 //因为增加了东西，所以这个也改
-`define EX_TO_MEM_WD 76 //TODO:完成ex段后改
+`define EX_TO_MEM_WD 80 //TODO:完成ex段后改
 `define MEM_TO_WB_WD 70
 `define BR_WD 33            // 分支预测信号宽度为 33 位
 `define DATA_SRAM_WD 69     // 数据 SRAM（静态随机存取存储器）的信号总线宽度为 69 位
