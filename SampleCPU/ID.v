@@ -29,9 +29,21 @@ module ID(
     wire [31:0] id_pc;  // 当前指令的PC值
     wire ce;  // 指令有效信号
 
-    wire wb_rf_we;  // 写回阶段的寄存器写使能信号
-    wire [4:0] wb_rf_waddr;  // 写回阶段的寄存器写地址
-    wire [31:0] wb_rf_wdata;  // 写回阶段的寄存器写数据
+    wire wb_rf_we;                          // WB阶段寄存器写使能信号
+    wire [4:0] wb_rf_waddr;                 // WB阶段寄存器写地址
+    wire [31:0] wb_rf_wdata;                // WB阶段寄存器写数据
+
+    wire wb_id_we;                          // WB阶段传递到ID阶段的写使能信号
+    wire [4:0] wb_id_waddr;                 // WB阶段传递到ID阶段的写地址
+    wire [31:0] wb_id_wdata;                // WB阶段传递到ID阶段的写数据
+
+    wire mem_id_we;                         // MEM阶段传递到ID阶段的写使能信号
+    wire [4:0] mem_id_waddr;                // MEM阶段传递到ID阶段的写地址
+    wire [31:0] mem_id_wdata;               // MEM阶段传递到ID阶段的写数据
+    reg q;                                  // 用于控制指令读取的寄存器
+    wire ex_id_we;                          // EX阶段传递到ID阶段的写使能信号
+    wire [4:0] ex_id_waddr;                 // EX阶段传递到ID阶段的写地址
+    wire [31:0] ex_id_wdata;                // EX阶段传递到ID阶段的写数据
 
     // 在时钟上升沿更新if_to_id_bus_r的值
     always @ (posedge clk) begin
@@ -49,16 +61,54 @@ module ID(
         end
     end
     
-    assign inst = inst_sram_rdata;  // 将指令存储器读取的数据赋值给inst
+    // 根据暂停信号更新q寄存器
+    always @(posedge clk) begin
+        if (stall[1]==`Stop) begin
+            q <= 1'b1;  // 暂停时置1
+        end
+        else begin
+            q <= 1'b0;  // 否则置0
+        end
+    end
+    assign inst = (q) ?inst: inst_sram_rdata;  // 根据q的值选择指令
+
+
+    // 从if_to_id_bus_r中提取指令有效信号和PC值
     assign {
         ce,
         id_pc
-    } = if_to_id_bus_r;  // 从if_to_id_bus_r中提取ce和id_pc
+    } = if_to_id_bus_r;
+
+    // 从wb_to_rf_bus中提取WB阶段的寄存器写信号
     assign {
         wb_rf_we,
         wb_rf_waddr,
         wb_rf_wdata
-    } = wb_to_rf_bus;  // 从wb_to_rf_bus中提取写回阶段的寄存器写使能、写地址和写数据
+    } = wb_to_rf_bus;
+
+    // 从wb_to_id中提取WB阶段传递到ID阶段的写信号
+    assign {
+        wb_id_we,
+        wb_id_waddr,
+        wb_id_wdata
+    } = wb_to_id;
+
+    // 从mem_to_id中提取MEM阶段传递到ID阶段的写信号
+    assign {
+        mem_id_we,
+        mem_id_waddr,
+        mem_id_wdata
+    } = mem_to_id;
+
+    // 从ex_to_id中提取EX阶段传递到ID阶段的写信号
+    assign {
+        ex_id_we,
+        ex_id_waddr,
+        ex_id_wdata
+    } = ex_to_id;
+
+
+
 
     wire [5:0] opcode;  // 指令的操作码
     wire [4:0] rs,rt,rd,sa;  // 指令中的寄存器地址和移位量
@@ -79,6 +129,7 @@ module ID(
 
     wire data_ram_en;  // 数据存储器使能信号
     wire [3:0] data_ram_wen;  // 数据存储器写使能信号
+    wire [3:0] data_ram_readen;  // 数据存储器读使能信号//XXX:新增
     
     wire rf_we;  // 寄存器文件写使能信号
     wire [4:0] rf_waddr;  // 寄存器文件写地址
@@ -86,6 +137,23 @@ module ID(
     wire [2:0] sel_rf_dst;  // 寄存器文件写地址选择信号
 
     wire [31:0] rdata1, rdata2;  // 从寄存器文件读取的数据
+    wire [31:0] rdata11, rdata22;  // 经过旁路处理的寄存器读数据//XXX:新增
+
+    wire hi_r,hi_wen,lo_r,lo_wen;  // HI/LO寄存器读写信号//XXX:新增
+    wire [31:0] hi_data;  // HI寄存器数据
+    wire [31:0] lo_data;  // LO寄存器数据
+    wire [31:0] hilo_data;  // HI/LO寄存器数据
+
+    // 从hilo_ex_to_id中提取HI/LO寄存器信号//XXX:新增
+    assign {
+        hi_wen,         // 65
+        lo_wen,         // 64
+        hi_data,        // 63:32
+        lo_data         // 31:0
+    } = hilo_ex_to_id;
+
+    assign hi_r = inst_mfhi;  // HI寄存器读使能//XXX:新增
+    assign lo_r = inst_mflo;  // LO寄存器读使能
 
     // 实例化寄存器文件模块
     regfile u_regfile(
@@ -96,7 +164,15 @@ module ID(
         .rdata2 (rdata2 ),
         .we     (wb_rf_we     ),
         .waddr  (wb_rf_waddr  ),
-        .wdata  (wb_rf_wdata  )
+        .wdata  (wb_rf_wdata  ),//XXX:新增
+
+        .hi_r      ( hi_r   ),
+        .hi_we     (  hi_wen   ),
+        .hi_data   (  hi_data  ),
+        .lo_r      (  lo_r   ),
+        .lo_we     (   lo_wen   ),
+        .lo_data   (   lo_data  ),
+        .hilo_data (   hilo_data )
     );
 
     // 从指令中提取各个字段
@@ -113,9 +189,18 @@ module ID(
     assign offset = inst[15:0];
     assign sel = inst[2:0];
 
-    wire inst_ori, inst_lui, inst_addiu, inst_beq;  // 指令类型判断信号
-
-    wire op_add, op_sub, op_slt, op_sltu;  // ALU操作类型信号
+    // 指令类型判断信号
+    wire inst_ori, inst_lui, inst_addiu, inst_beq,
+    inst_subu, inst_jr, inst_jal, inst_lw, inst_or, inst_sll, inst_addu, inst_bne,
+    inst_xor, inst_xori, inst_nor, inst_sw, inst_sltu, inst_slt, inst_slti, inst_sltiu,
+    inst_j, inst_add, inst_addi, inst_sub, inst_and, inst_andi, inst_sllv, inst_sra,
+    inst_srav, inst_srl, inst_srlv, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
+    inst_bltzal, inst_bgezal, inst_jalr, inst_div, inst_divu, inst_mflo, inst_mfhi,
+    inst_mult, inst_multu, inst_mthi, inst_mtlo, inst_lb, inst_lbu, inst_lh, inst_lhu,
+    inst_sb, inst_lsa, inst_sh;  
+    
+    // ALU操作类型信号
+    wire op_add, op_sub, op_slt, op_sltu;  
     wire op_and, op_nor, op_or, op_xor;
     wire op_sll, op_srl, op_sra, op_lui;
 
@@ -247,10 +332,24 @@ module ID(
     assign data_ram_en =inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_lw | inst_sw | inst_lb;
     assign data_ram_wen = inst_sw ? 4'b1111 : 4'b0000;
 
+    // 数据存储器读使能信号
+    assign data_ram_readen =  inst_lw  ? 4'b1111 
+                             :inst_lb  ? 4'b0001 
+                             :inst_lbu ? 4'b0010
+                             :inst_lh  ? 4'b0011
+                             :inst_lhu ? 4'b0100
+                             :inst_sb  ? 4'b0101
+                             :inst_sh  ? 4'b0111
+                             :4'b0000;
 
 
     // 寄存器文件写使能信号
-    assign rf_we = inst_ori | inst_lui | inst_addiu;
+    assign rf_we =inst_lsa|inst_lhu | inst_lh | inst_lbu | inst_lb| inst_mfhi | 
+    inst_mflo | inst_jalr |inst_bgezal | inst_bltzal|inst_srl | inst_srlv | 
+    inst_srav | inst_sra | inst_sllv | inst_andi | inst_and | inst_sub | inst_addi 
+    | inst_add | inst_sltiu | inst_slti | inst_slt | inst_sltu | inst_nor |inst_xori
+    | inst_xor | inst_sll | inst_ori | inst_lui | inst_addiu | inst_subu | inst_jal
+    | inst_lw | inst_addu | inst_or;
 
 
     /*TODO：lby：结合上一个todo，结合mem段功能
@@ -276,8 +375,23 @@ module ID(
     // 寄存器文件写数据选择信号（未使用）//lby：这个gpt加的注释可能不对
     assign sel_rf_res = 1'b0; //学长的代码在这里没有修改
 
+    // LSA指令处理
+    wire [31:0] rdata111;
+    assign rdata111 = (inst_lsa &inst[7:6]==2'b11) ? {rdata11[27:0] ,4'b0}
+                    :(inst_lsa & inst[7:6]==2'b10) ? {rdata11[28:0] ,3'b0}
+                    :(inst_lsa & inst[7:6]==2'b01) ? {rdata11[29:0] ,2'b0}
+                    :(inst_lsa & inst[7:6]==2'b00) ? {rdata11[30:0] ,1'b0}
+                    :rdata11;
+
     // 组合ID段传递到EX段的总线信号
     assign id_to_ex_bus = {
+        data_ram_readen,//168:165
+        inst_mthi,      //164
+        inst_mtlo,      //163
+        inst_multu,     //162
+        inst_mult,      //161
+        inst_divu,      //160
+        inst_div,       //159
         id_pc,          // 158:127
         inst,           // 126:95
         alu_op,         // 94:83
@@ -288,8 +402,8 @@ module ID(
         rf_we,          // 70
         rf_waddr,       // 69:65
         sel_rf_res,     // 64
-        rdata1,         // 63:32
-        rdata2          // 31:0
+        rdata111,         // 63:32
+        rdata22          // 31:0
     };
 
     // 分支信号生成逻辑
@@ -301,12 +415,23 @@ module ID(
     wire rs_le_z;  // rs小于等于零信号
     wire rs_lt_z;  // rs小于零信号
     wire [31:0] pc_plus_4;  // PC+4的值
+    
     assign pc_plus_4 = id_pc + 32'h4;
+    assign rs_ge_z  = (rdata11[31] == 1'b0); //大于等于0
+    assign rs_gt_z  = (rdata11[31] == 1'b0 & rdata11 != 32'b0  );  //大于0
+    assign rs_le_z  = (rdata11[31] == 1'b1 | rdata11 == 32'b0  );  //小于等于0
+    assign rs_lt_z  = (rdata11[31] == 1'b1);  //小于0
+    assign rs_eq_rt = (rdata11 == rdata22);// 判断rs和rt是否相等
 
-    assign rs_eq_rt = (rdata1 == rdata2);  // 判断rs和rt是否相等
 
-    assign br_e = inst_beq & rs_eq_rt;  // 生成分支使能信号
-    assign br_addr = inst_beq ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0}) : 32'b0;  // 计算分支目标地址
+    // 分支判断
+    assign br_e =  inst_jalr | (inst_bgezal & rs_ge_z ) | ( inst_bltzal & rs_lt_z) | (inst_bgtz & rs_gt_z  ) | (inst_bltz & rs_lt_z) | (inst_blez & rs_le_z) | (inst_bgez & rs_ge_z ) | (inst_beq & rs_eq_rt) | inst_jr | inst_jal | (inst_bne & !rs_eq_rt) | inst_j ;
+    assign br_addr = inst_beq ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b0}) 
+                    :(inst_jr |inst_jalr)  ? (rdata11)  
+                    : inst_jal ? ({pc_plus_4[31:28],inst[25:0],2'b0}) 
+                    : inst_j ? ({pc_plus_4[31:28],inst[25:0],2'b0}) 
+                    :(inst_bgezal|inst_bltzal |inst_blez | inst_bltz |inst_bgez |inst_bgtz ) ? (pc_plus_4 + {{14{inst[15]}},inst[15:0],2'b00})
+                    :inst_bne ? (pc_plus_4 + {{14{inst[15]}},{inst[15:0],2'b00}}) : 32'b0;
 
     // 组合分支信号总线
     assign br_bus = {
@@ -314,6 +439,7 @@ module ID(
         br_addr
     };
 
-    
+    // ID阶段产生的暂停请求信号
+    assign stallreq_from_id = (ex_is_load  & ex_id_waddr == rs) | (ex_is_load & ex_id_waddr == rt) ;
     
 endmodule
