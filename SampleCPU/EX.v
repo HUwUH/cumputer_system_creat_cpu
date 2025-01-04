@@ -184,32 +184,118 @@ module EX(
     wire inst_mult,inst_multu;
     wire [63:0] mul_result;
 
-
-    wire mul_signed; // 有符号乘法标记
-    assign mul_signed =   inst_mult  ? 1 
-                        : inst_multu ? 0 
-                        : 0; 
+    //*************原有的  booth-Wallace 乘法器*************************
+    // wire mul_signed; // 有符号乘法标记
+    // assign mul_signed =   inst_mult  ? 1 
+    //                     : inst_multu ? 0 
+    //                     : 0; 
     
-    wire [31:0] mul_data1,mul_data2;
-    assign mul_data1 = (inst_mult | inst_multu) ? rf_rdata1 : 32'b0;
-    assign mul_data2 = (inst_mult | inst_multu) ? rf_rdata2 : 32'b0;
+    // wire [31:0] mul_data1,mul_data2;
+    // assign mul_data1 = (inst_mult | inst_multu) ? rf_rdata1 : 32'b0;
+    // assign mul_data2 = (inst_mult | inst_multu) ? rf_rdata2 : 32'b0;
 
-    mul u_mul(
-    	.clk        (clk            ),
-        .resetn     (~rst           ),
-        .mul_signed (mul_signed     ),
-        .ina        (mul_opdata1_o      ), // 乘法源操作数1
-        .inb        (mul_opdata2_o      ), // 乘法源操作数2
-        .result     (mul_result     ) // 乘法结果 64bit
+    // mul u_mul(
+    // 	.clk        (clk            ),
+    //     .resetn     (~rst           ),
+    //     .mul_signed (mul_signed     ),
+    //     .ina        (mul_opdata1_o      ), // 乘法源操作数1
+    //     .inb        (mul_opdata2_o      ), // 乘法源操作数2
+    //     .result     (mul_result     ) // 乘法结果 64bit
+    // );
+    //*****************************************************************
+
+    //自己家的32周期移位乘法器
+    //******************************************************************
+    reg stallreq_for_mul;
+    wire mul_ready_i;
+    reg signed_mul_o; //是否是有符号乘法
+    reg [31:0] mul_opdata1_o;
+    reg [31:0] mul_opdata2_o;
+    reg mul_start_o;
+    mymul my_mul(
+        .rst            (rst           ),
+	    .clk            (clk            ),
+	    .signed_mul_i   (signed_mul_o     ),
+	    .a_o            (mul_opdata1_o      ),
+	    .b_o            (mul_opdata2_o      ),
+	    .start_i        (mul_start_o      ),
+	    .result_o       (mul_result     ),
+	    .ready_o        (mul_ready_i     )
     );
-
+    always @ (*) begin
+        if (rst) begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+        end
+        else begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+            case ({inst_mult,inst_multu})
+                2'b10:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                2'b01:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                default:begin
+                end
+            endcase
+        end
+    end
+    //******************************************************************
 
     // DIV part 除法单元
     wire [63:0] div_result;
     wire inst_div, inst_divu;         // 是否是除法指令
     wire div_ready_i;                 // 除法结果是否准备好
     reg stallreq_for_div;             // 除法暂停信号
-    assign stallreq_from_ex = stallreq_for_div ;
+    assign stallreq_from_ex = stallreq_for_div | stallreq_for_mul;
 
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
