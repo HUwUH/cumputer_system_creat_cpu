@@ -175,6 +175,29 @@ module ID(
         .hilo_data (   hilo_data )
     );
 
+    wire [31:0] mf_data;
+    assign mf_data = (inst_mfhi & hi_wen) ? hi_data
+                    :(inst_mfhi) ? hilo_data
+                    :(inst_mflo & lo_wen) ? lo_data
+                    :(inst_mflo) ? hilo_data
+                    :(32'b0);
+    
+  
+    assign rdata11 = (inst_mfhi | inst_mflo) ? mf_data
+                   :(ex_id_we &(ex_id_waddr==rs))?ex_id_wdata
+                   : (mem_id_we &(mem_id_waddr==rs)) ? mem_id_wdata
+                   : (wb_id_we &(wb_id_waddr==rs)) ? wb_id_wdata 
+                   : rdata1;
+    assign rdata22 =  (inst_mfhi | inst_mflo) ? mf_data
+                   :(ex_id_we &(ex_id_waddr==rt))?ex_id_wdata
+                   : (mem_id_we &(mem_id_waddr==rt)) ? mem_id_wdata
+                   : (wb_id_we &(wb_id_waddr==rt)) ? wb_id_wdata 
+                   : rdata2;
+
+
+
+
+
     // 从指令中提取各个字段
     assign opcode = inst[31:26];
     assign rs = inst[25:21];
